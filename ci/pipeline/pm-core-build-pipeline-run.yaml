@@ -1,0 +1,22 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: pm-core-build-pipeline-run
+spec:
+  pipelineRef:
+    name: jib-maven-build-pipeline
+  params:
+    - name: git-url
+      value: https://github.com/anshadkm/pm-core.git
+    - name: revision
+      value: master
+    - name: image
+      value: harbor.pm1.fyre.ibm.com/ibm/pm/core:1.0
+    - name: registry-username
+      value: admin
+    - name: registry-password
+      value: admin
+  workspaces:
+    - name: shared-workspace
+      persistentVolumeClaim:
+        claimName: jib-maven-source-pvc

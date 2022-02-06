@@ -1,0 +1,70 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: jib-maven-build-pipeline
+spec:
+  params:
+    - name: git-url
+      description: Repository URL to clone from.
+    - name: revision
+      description: Revision to checkout. (branch, tag, sha, ref, etc...)
+      default: master
+    - name: image
+      description: Name of the image to build
+    - name: registry-username
+      description: Username for the registry
+    - name: registry-password
+      description: Password for the registry
+  workspaces:
+    - name: shared-workspace
+  tasks:
+    - name: fetch-repository
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: subdirectory
+          value: ""
+        - name: revision
+          value: $(params.revision)
+        - name: deleteExisting
+          value: "true"
+    - name: jib-maven
+      taskRef:
+        name: jib-maven
+      runAfter:
+        - fetch-repository
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: IMAGE
+          value: $(params.image)
+        - name: INSECUREREGISTRY
+          value: "true"
+        - name: REGISTRYUSERNAME
+          value: $(params.registry-username)
+        - name: REGISTRYPASSWORD
+          value: $(params.registry-password)
+    - name: verify-digest
+      runAfter:
+        - jib-maven
+      params:
+        - name: digest
+          value: $(tasks.jib-maven.results.IMAGE_DIGEST)
+      taskSpec:
+        params:
+          - name: digest
+        steps:
+          - name: bash
+            image: ubuntu
+            script: |
+              echo $(params.digest)
+              case .$(params.digest) in
+                ".sha"*) exit 0 ;;
+                *)       echo "Digest value is not correct" && exit 1 ;;
+              esac
